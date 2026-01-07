@@ -1,0 +1,356 @@
+---
+title: 'Gemini 多模态对话示例'
+description: '使用Gemini进行图片理解和视频理解的完整示例代码'
+---
+
+# Gemini 多模态对话示例
+
+以下示例展示如何使用Gemini的多模态功能，让AI理解和分析图片、视频内容，进行多媒体智能对话。
+
+## 快速开始
+
+只需要替换 `<API-KEY>` 为你的实际API密钥即可运行。
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tokenops.ai/v1beta/models/gemini-2.5-flash:generateContent" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "这张图片里有什么？请详细描述。"
+          },
+          {
+            "inlineData": {
+              "mimeType": "image/jpeg",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            }
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+import base64
+import mimetypes
+import os
+
+# 配置API密钥和基础URL
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1beta"
+
+def encode_file_to_base64(file_path):
+    """将文件编码为base64格式"""
+    try:
+        with open(file_path, "rb") as file:
+            return base64.b64encode(file.read()).decode('utf-8')
+    except Exception as e:
+        raise Exception(f"文件编码失败: {e}")
+
+def get_mime_type(file_path):
+    """获取文件的MIME类型"""
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if mime_type is None:
+        extension = file_path.lower().split('.')[-1]
+        mime_types = {
+            'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+            'png': 'image/png', 'gif': 'image/gif',
+            'webp': 'image/webp', 'bmp': 'image/bmp',
+            'mp4': 'video/mp4', 'mov': 'video/quicktime',
+            'avi': 'video/x-msvideo', 'webm': 'video/webm'
+        }
+        mime_type = mime_types.get(extension, 'application/octet-stream')
+    return mime_type
+
+def gemini_multimodal_chat(text_prompt, file_paths=None):
+    """
+    与Gemini进行多模态对话
+
+    Args:
+        text_prompt: 文本提示
+        file_paths: 文件路径列表 (图片、视频)
+    """
+    url = f"{BASE_URL}/models/gemini-2.5-flash:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    parts = [{"text": text_prompt}]
+
+    if file_paths:
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                file_base64 = encode_file_to_base64(file_path)
+                mime_type = get_mime_type(file_path)
+                parts.append({
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": file_base64
+                    }
+                })
+            else:
+                print(f"警告: 文件不存在 - {file_path}")
+
+    data = {
+        "contents": [{"parts": parts}]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            result = response.json()
+            if 'candidates' in result and len(result['candidates']) > 0:
+                content = result['candidates'][0]['content']
+                if 'parts' in content and len(content['parts']) > 0:
+                    return content['parts'][0]['text']
+        return f"错误: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"请求失败: {e}"
+
+def analyze_image(image_path):
+    """使用Gemini分析图片内容"""
+    prompt = """请详细分析这张图片，包括：
+1. 主要对象和场景
+2. 色彩搭配和构图
+3. 图片传达的情感
+请用中文详细回答。"""
+    return gemini_multimodal_chat(prompt, [image_path])
+
+def analyze_video(video_path):
+    """分析视频内容"""
+    prompt = """请分析这个视频的内容，包括：
+1. 视频主题和内容概述
+2. 主要场景和画面
+3. 人物动作和情节发展
+请详细分析并给出专业建议。"""
+    return gemini_multimodal_chat(prompt, [video_path])
+
+# 使用示例
+if __name__ == "__main__":
+    print("=== Gemini多模态对话示例 ===\n")
+
+    sample_image = "sample_photo.jpg"
+    sample_video = "sample_video.mp4"
+
+    if os.path.exists(sample_image):
+        print("图片内容分析:")
+        print(analyze_image(sample_image))
+
+    if os.path.exists(sample_video):
+        print("\n视频内容分析:")
+        print(analyze_video(sample_video))
+```
+
+</CodeGroup>
+
+## 使用File API上传大视频文件
+
+对于超过20MB的大视频文件，推荐先使用File API上传，然后通过文件URI进行视频理解分析。
+
+<CodeGroup>
+
+```bash cURL
+# 第一步：上传视频文件
+curl --request POST \
+  --url https://api.tokenops.ai/v1/files/upload \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: video/mp4' \
+  --header 'filename: my_large_video.mp4' \
+  --data-binary '@/path/to/your/large_video.mp4'
+
+# 响应示例:
+# {
+#   "uri": "tokenops://bucket.example.com/file_api/20241016/my_large_video.mp4",
+#   "mime_type": "video/mp4"
+# }
+
+# 第二步：使用文件URI进行视频理解
+curl -X POST "https://api.tokenops.ai/v1beta/models/gemini-2.5-flash:generateContent" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "请详细分析这个视频的内容，包括场景、人物、动作和情节发展。"
+          },
+          {
+            "fileData": {
+              "mimeType": "video/mp4",
+              "fileUri": "tokenops://bucket.example.com/file_api/20241016/my_large_video.mp4"
+            }
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+import os
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai"
+
+def upload_video_file(file_path):
+    """上传视频文件到File API"""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+
+    filename = os.path.basename(file_path)
+    mime_types = {
+        '.mp4': 'video/mp4',
+        '.mov': 'video/quicktime',
+        '.avi': 'video/x-msvideo',
+        '.webm': 'video/webm'
+    }
+
+    file_ext = os.path.splitext(filename)[1].lower()
+    content_type = mime_types.get(file_ext, 'video/mp4')
+
+    url = f"{BASE_URL}/v1/files/upload"
+    headers = {
+        'Authorization': f'Bearer {API_KEY}',
+        'Content-Type': content_type,
+        'filename': filename
+    }
+
+    with open(file_path, 'rb') as file:
+        response = requests.post(url, headers=headers, data=file)
+
+    if response.status_code == 200:
+        result = response.json()
+        return {
+            'uri': result.get('uri'),
+            'mime_type': result.get('mime_type')
+        }
+    else:
+        raise Exception(f"上传失败: {response.status_code} - {response.text}")
+
+def analyze_video_with_file_api(file_info, prompt="请详细分析这个视频的内容"):
+    """使用上传的文件URI进行视频分析"""
+    url = f"{BASE_URL}/v1beta/models/gemini-2.5-flash:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    data = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {
+                    "fileData": {
+                        "mimeType": file_info['mime_type'],
+                        "fileUri": file_info['uri']
+                    }
+                }
+            ]
+        }]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        if 'candidates' in result and len(result['candidates']) > 0:
+            content = result['candidates'][0]['content']
+            if 'parts' in content and len(content['parts']) > 0:
+                return content['parts'][0]['text']
+    return f"分析请求失败: {response.status_code} - {response.text}"
+
+# 使用示例
+if __name__ == "__main__":
+    video_path = "my_video.mp4"
+
+    if os.path.exists(video_path):
+        print("正在上传视频文件...")
+        file_info = upload_video_file(video_path)
+        print(f"上传成功，URI: {file_info['uri']}")
+
+        print("正在分析视频内容...")
+        analysis = analyze_video_with_file_api(file_info, "请描述这个视频的主要内容")
+        print(f"分析结果：{analysis}")
+```
+
+</CodeGroup>
+
+### File API 说明
+
+File API 上传成功后返回包含 `uri` 和 `mime_type` 的JSON格式：
+```json
+{
+  "uri": "tokenops://bucket.example.com/file_api/20241016/test.mp4",
+  "mime_type": "video/mp4"
+}
+```
+
+在视频理解API中使用 `uri` 作为 `fileUri` 字段：
+```json
+{
+  "fileData": {
+    "mimeType": "video/mp4",
+    "fileUri": "tokenops://bucket.example.com/file_api/20241016/test.mp4"
+  }
+}
+```
+
+## API格式说明
+
+### 基本请求结构
+```json
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "分析这个文件"
+        },
+        {
+          "inlineData": {
+            "mimeType": "image/jpeg",
+            "data": "base64编码的文件数据"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 多文件输入
+```json
+{
+  "contents": [
+    {
+      "parts": [
+        {
+          "text": "比较这些文件"
+        },
+        {
+          "inlineData": {
+            "mimeType": "image/jpeg",
+            "data": "第一个文件的base64数据"
+          }
+        },
+        {
+          "inlineData": {
+            "mimeType": "video/mp4",
+            "data": "第二个文件的base64数据"
+          }
+        }
+      ]
+    }
+  ]
+}
+```

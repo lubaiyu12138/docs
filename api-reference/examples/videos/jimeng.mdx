@@ -1,0 +1,2461 @@
+---
+title: '即梦视频生成示例'
+description: '调用即梦视频生成模型的完整示例代码'
+---
+
+# 即梦视频生成示例
+
+以下示例展示如何使用即梦（Jimeng）视频生成模型通过 OpenAI 兼容接口生成高质量的视频内容。
+
+即梦视频生成分为三个步骤：
+1. **创建视频生成任务** - 提交生成请求，获得任务ID
+2. **查询任务状态** - 定期检查任务进度
+3. **下载生成的视频** - 任务完成后下载视频文件
+
+## 步骤1：创建视频生成任务
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.tokenops.ai/v1/videos \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "jimeng-video-3.0-pro",
+    "prompt": "千军万马奔腾在草原上，阳光明媚，高清画质",
+    "req_key": "jimeng_ti2v_v30_pro",
+    "seed": -1,
+    "frames": 121,
+    "aspect_ratio": "16:9"
+  }'
+```
+
+```python Python
+import requests
+import time
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def create_jimeng_video(prompt, model="jimeng_ti2v_v30_pro", **kwargs):
+    """
+    创建即梦视频生成任务
+
+    Args:
+        prompt: 视频描述文本
+        model: 使用的模型名称
+        **kwargs: 其他参数（seed, frames, aspect_ratio, image_urls）
+
+    Returns:
+        任务创建响应
+    """
+    url = f"{BASE_URL}/videos"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # 构建请求数据
+    data = {
+        "model": model,
+        "prompt": prompt
+    }
+
+    # 添加即梦特有参数
+    for key in ["req_key", "seed", "frames", "aspect_ratio", "image_urls"]:
+        if key in kwargs:
+            data[key] = kwargs[key]
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"即梦视频生成任务已创建")
+            print(f"任务ID: {result.get('id')}")
+            print(f"状态: {result.get('status')}")
+            return result
+        else:
+            print(f"错误: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 示例：创建任务
+result = create_jimeng_video(
+    prompt="千军万马奔腾在草原上，阳光明媚，高清画质",
+    req_key="jimeng_ti2v_v30_pro",
+    seed=-1,
+    frames=121,
+    aspect_ratio="16:9"
+)
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function createJimengVideo(prompt, model = 'jimeng_ti2v_v30_pro', options = {}) {
+    const url = `${BASE_URL}/videos`;
+    
+    const data = {
+        model: model,
+        prompt: prompt,
+        ...options
+    };
+    
+    try {
+        const response = await axios.post(url, data, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('即梦视频生成任务已创建');
+        console.log(`任务ID: ${response.data.id}`);
+        console.log(`状态: ${response.data.status}`);
+        
+        return response.data;
+    } catch (error) {
+        console.error('任务创建失败:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：创建任务
+const result = await createJimengVideo(
+    '千军万马奔腾在草原上，阳光明媚，高清画质',
+    'jimeng_ti2v_v30_pro',
+    {
+        req_key: 'jimeng_ti2v_v30_pro',
+        seed: -1,
+        frames: 121,
+        aspect_ratio: '16:9'
+    }
+);
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+const (
+    APIKey  = "<API-KEY>"
+    BaseURL = "https://api.tokenops.ai/v1"
+)
+
+type JimengVideoRequest struct {
+    Model       string   `json:"model"`
+    Prompt      string   `json:"prompt"`
+    ReqKey      string   `json:"req_key,omitempty"`
+    Seed        int      `json:"seed,omitempty"`
+    Frames      int      `json:"frames,omitempty"`
+    AspectRatio string   `json:"aspect_ratio,omitempty"`
+    ImageUrls   []string `json:"image_urls,omitempty"`
+}
+
+type JimengVideoResponse struct {
+    ID        string `json:"id"`
+    Object    string `json:"object"`
+    CreatedAt int64  `json:"created_at"`
+    Status    string `json:"status"`
+}
+
+func createJimengVideo(prompt string, options JimengVideoRequest) (*JimengVideoResponse, error) {
+    url := fmt.Sprintf("%s/videos", BaseURL)
+    
+    options.Prompt = prompt
+    if options.Model == "" {
+        options.Model = "jimeng_ti2v_v30_pro"
+    }
+    
+    jsonData, err := json.Marshal(options)
+    if err != nil {
+        return nil, fmt.Errorf("JSON序列化失败: %v", err)
+    }
+    
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("创建请求失败: %v", err)
+    }
+    
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    req.Header.Set("Content-Type", "application/json")
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+    
+    responseBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("读取响应失败: %v", err)
+    }
+    
+    if resp.StatusCode != 200 {
+        return nil, fmt.Errorf("API错误: %d - %s", resp.StatusCode, string(responseBody))
+    }
+    
+    var result JimengVideoResponse
+    if err := json.Unmarshal(responseBody, &result); err != nil {
+        return nil, fmt.Errorf("解析响应失败: %v", err)
+    }
+    
+    fmt.Printf("即梦视频生成任务已创建\n")
+    fmt.Printf("任务ID: %s\n", result.ID)
+    fmt.Printf("状态: %s\n", result.Status)
+    
+    return &result, nil
+}
+
+// 示例：创建任务
+func main() {
+    result, err := createJimengVideo("千军万马奔腾在草原上，阳光明媚，高清画质", JimengVideoRequest{
+        ReqKey:      "jimeng_ti2v_v30_pro",
+        Seed:        -1,
+        Frames:      121,
+        AspectRatio: "16:9",
+    })
+    if err != nil {
+        fmt.Printf("任务创建失败: %v\n", err)
+        return
+    }
+    fmt.Printf("任务创建成功: %+v\n", result)
+}
+```
+
+</CodeGroup>
+
+### 响应示例
+
+```json
+{
+  "id": "10762451179911711518",
+  "object": "video", 
+  "created_at": 1762776961,
+  "status": "in_queue"
+}
+```
+
+## 步骤2：查询任务状态
+
+<CodeGroup>
+
+```bash cURL
+# 查询任务状态
+curl -X GET "https://api.tokenops.ai/v1/videos/10762451179911711518" \
+  --header 'Authorization: Bearer <API-KEY>'
+```
+
+```python Python
+def check_video_status(video_id):
+    """
+    检查视频生成状态
+    
+    Args:
+        video_id: 视频任务ID
+        
+    Returns:
+        任务状态信息
+    """
+    url = f"{BASE_URL}/videos/{video_id}"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"任务状态: {result.get('status')}")
+            return result
+        else:
+            print(f"查询失败: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 示例：查询状态
+video_id = "10762451179911711518"
+status_info = check_video_status(video_id)
+```
+
+```javascript JavaScript/Node.js
+async function checkVideoStatus(videoId) {
+    const url = `${BASE_URL}/videos/${videoId}`;
+    
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`
+            }
+        });
+        
+        console.log(`任务状态: ${response.data.status}`);
+        return response.data;
+    } catch (error) {
+        console.error('状态查询失败:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：查询状态
+const videoId = '10762451179911711518';
+const statusInfo = await checkVideoStatus(videoId);
+```
+
+```go Go
+func checkVideoStatus(videoID string) (*JimengVideoResponse, error) {
+    url := fmt.Sprintf("%s/videos/%s", BaseURL, videoID)
+    
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("创建请求失败: %v", err)
+    }
+    
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+    
+    responseBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("读取响应失败: %v", err)
+    }
+    
+    if resp.StatusCode != 200 {
+        return nil, fmt.Errorf("API错误: %d - %s", resp.StatusCode, string(responseBody))
+    }
+    
+    var result JimengVideoResponse
+    if err := json.Unmarshal(responseBody, &result); err != nil {
+        return nil, fmt.Errorf("解析响应失败: %v", err)
+    }
+    
+    fmt.Printf("任务状态: %s\n", result.Status)
+    return &result, nil
+}
+
+// 示例：查询状态
+videoID := "10762451179911711518"
+statusInfo, err := checkVideoStatus(videoID)
+```
+
+</CodeGroup>
+
+### 状态响应示例
+
+**排队中:**
+```json
+{
+  "id": "10762451179911711518",
+  "object": "video",
+  "status": "in_queue"
+}
+```
+
+**已完成:**
+```json
+{
+  "id": "10762451179911711518", 
+  "object": "video",
+  "status": "completed"
+}
+```
+
+## 步骤3：下载生成的视频
+
+<CodeGroup>
+
+```bash cURL
+# 下载视频文件
+curl -X GET "https://api.tokenops.ai/v1/videos/10762451179911711518/content" \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --output video.mp4
+```
+
+```python Python
+def download_video(video_id, output_path="jimeng_video.mp4"):
+    """
+    下载生成的视频
+    
+    Args:
+        video_id: 视频任务ID
+        output_path: 输出文件路径
+        
+    Returns:
+        是否下载成功
+    """
+    url = f"{BASE_URL}/videos/{video_id}/content"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            with open(output_path, "wb") as f:
+                f.write(response.content)
+            print(f"视频已保存: {output_path}")
+            return True
+        else:
+            print(f"下载失败: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"下载失败: {e}")
+        return False
+
+# 示例：下载视频
+video_id = "10762451179911711518"
+success = download_video(video_id, "jimeng_video.mp4")
+```
+
+```javascript JavaScript/Node.js
+const fs = require('fs');
+
+async function downloadVideo(videoId, outputPath = 'jimeng_video.mp4') {
+    const url = `${BASE_URL}/videos/${videoId}/content`;
+    
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`
+            },
+            responseType: 'stream'
+        });
+        
+        const writer = fs.createWriteStream(outputPath);
+        response.data.pipe(writer);
+        
+        return new Promise((resolve, reject) => {
+            writer.on('finish', () => {
+                console.log(`视频已保存: ${outputPath}`);
+                resolve(true);
+            });
+            writer.on('error', reject);
+        });
+    } catch (error) {
+        console.error('视频下载失败:', error.response?.data || error.message);
+        return false;
+    }
+}
+
+// 示例：下载视频
+const videoId = '10762451179911711518';
+const success = await downloadVideo(videoId, 'jimeng_video.mp4');
+```
+
+```go Go
+import "os"
+
+func downloadVideo(videoID, outputPath string) error {
+    url := fmt.Sprintf("%s/videos/%s/content", BaseURL, videoID)
+    
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return fmt.Errorf("创建请求失败: %v", err)
+    }
+    
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode != 200 {
+        return fmt.Errorf("下载失败: %d", resp.StatusCode)
+    }
+    
+    file, err := os.Create(outputPath)
+    if err != nil {
+        return fmt.Errorf("创建文件失败: %v", err)
+    }
+    defer file.Close()
+    
+    _, err = io.Copy(file, resp.Body)
+    if err != nil {
+        return fmt.Errorf("写入文件失败: %v", err)
+    }
+    
+    fmt.Printf("视频已保存: %s\n", outputPath)
+    return nil
+}
+
+// 示例：下载视频
+videoID := "10762451179911711518"
+err := downloadVideo(videoID, "jimeng_video.mp4")
+if err != nil {
+    fmt.Printf("下载失败: %v\n", err)
+}
+```
+
+</CodeGroup>
+
+## 完整流程示例
+
+<CodeGroup>
+
+```python Python
+import requests
+import time
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def complete_jimeng_video_generation(prompt, **kwargs):
+    """
+    完整的即梦视频生成流程
+    """
+    # 步骤1: 创建任务
+    print("步骤1: 创建视频生成任务...")
+    create_result = create_jimeng_video(prompt, **kwargs)
+    if not create_result:
+        return False
+    
+    video_id = create_result['id'] 
+    print(f"任务ID: {video_id}")
+    
+    # 步骤2: 等待任务完成
+    print("步骤2: 等待任务完成...")
+    max_wait_time = 600  # 10分钟
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait_time:
+        status_info = check_video_status(video_id)
+        if not status_info:
+            break
+            
+        status = status_info.get('status')
+        print(f"当前状态: {status}")
+        
+        if status == 'completed':
+            print("视频生成完成！")
+            break
+        elif status == 'failed':
+            print("视频生成失败")
+            return False
+        
+        time.sleep(15)  # 每15秒检查一次
+    else:
+        print("等待超时")
+        return False
+    
+    # 步骤3: 下载视频
+    print("步骤3: 下载视频...")
+    output_path = f"jimeng_video_{video_id}.mp4"
+    if download_video(video_id, output_path):
+        print(f"视频生成完成: {output_path}")
+        return True
+    
+    return False
+
+# 使用示例
+if __name__ == "__main__":
+    success = complete_jimeng_video_generation(
+        prompt="千军万马奔腾在草原上，阳光明媚，高清画质",
+        req_key="jimeng_ti2v_v30_pro",
+        seed=-1,
+        frames=121,
+        aspect_ratio="16:9"
+    )
+    
+    if success:
+        print("✅ 视频生成成功！")
+    else:
+        print("❌ 视频生成失败！")
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+const fs = require('fs');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function completeJimengVideoGeneration(prompt, options = {}) {
+    try {
+        // 步骤1: 创建任务
+        console.log('步骤1: 创建视频生成任务...');
+        const createResult = await createJimengVideo(prompt, 'jimeng_ti2v_v30_pro', options);
+        if (!createResult) {
+            return false;
+        }
+        
+        const videoId = createResult.id;
+        console.log(`任务ID: ${videoId}`);
+        
+        // 步骤2: 等待任务完成
+        console.log('步骤2: 等待任务完成...');
+        const maxWaitTime = 10 * 60 * 1000; // 10分钟
+        const startTime = Date.now();
+        
+        while (Date.now() - startTime < maxWaitTime) {
+            const statusInfo = await checkVideoStatus(videoId);
+            if (!statusInfo) {
+                break;
+            }
+            
+            const status = statusInfo.status;
+            console.log(`当前状态: ${status}`);
+            
+            if (status === 'completed') {
+                console.log('视频生成完成！');
+                break;
+            } else if (status === 'failed') {
+                console.log('视频生成失败');
+                return false;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 15000)); // 等待15秒
+        }
+        
+        // 步骤3: 下载视频
+        console.log('步骤3: 下载视频...');
+        const outputPath = `jimeng_video_${videoId}.mp4`;
+        const success = await downloadVideo(videoId, outputPath);
+        
+        if (success) {
+            console.log(`视频生成完成: ${outputPath}`);
+            return true;
+        }
+        
+        return false;
+        
+    } catch (error) {
+        console.error('完整流程执行失败:', error);
+        return false;
+    }
+}
+
+// 使用示例
+(async () => {
+    const success = await completeJimengVideoGeneration(
+        '千军万马奔腾在草原上，阳光明媚，高清画质',
+        {
+            req_key: 'jimeng_ti2v_v30_pro',
+            seed: -1,
+            frames: 121,
+            aspect_ratio: '16:9'
+        }
+    );
+    
+    if (success) {
+        console.log('✅ 视频生成成功！');
+    } else {
+        console.log('❌ 视频生成失败！');
+    }
+})();
+```
+
+```go Go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func completeJimengVideoGeneration(prompt string, options JimengVideoRequest) error {
+    // 步骤1: 创建任务
+    fmt.Println("步骤1: 创建视频生成任务...")
+    createResult, err := createJimengVideo(prompt, options)
+    if err != nil {
+        return fmt.Errorf("创建任务失败: %v", err)
+    }
+    
+    videoID := createResult.ID
+    fmt.Printf("任务ID: %s\n", videoID)
+    
+    // 步骤2: 等待任务完成
+    fmt.Println("步骤2: 等待任务完成...")
+    maxWaitTime := 10 * time.Minute
+    startTime := time.Now()
+    
+    for time.Since(startTime) < maxWaitTime {
+        statusInfo, err := checkVideoStatus(videoID)
+        if err != nil {
+            return fmt.Errorf("查询状态失败: %v", err)
+        }
+        
+        status := statusInfo.Status
+        fmt.Printf("当前状态: %s\n", status)
+        
+        if status == "completed" {
+            fmt.Println("视频生成完成！")
+            break
+        } else if status == "failed" {
+            return fmt.Errorf("视频生成失败")
+        }
+        
+        time.Sleep(15 * time.Second) // 等待15秒
+    }
+    
+    // 步骤3: 下载视频
+    fmt.Println("步骤3: 下载视频...")
+    outputPath := fmt.Sprintf("jimeng_video_%s.mp4", videoID)
+    if err := downloadVideo(videoID, outputPath); err != nil {
+        return fmt.Errorf("下载视频失败: %v", err)
+    }
+    
+    fmt.Printf("视频生成完成: %s\n", outputPath)
+    return nil
+}
+
+// 使用示例
+func main() {
+    err := completeJimengVideoGeneration(
+        "千军万马奔腾在草原上，阳光明媚，高清画质",
+        JimengVideoRequest{
+            ReqKey:      "jimeng_ti2v_v30_pro",
+            Seed:        -1,
+            Frames:      121,
+            AspectRatio: "16:9",
+        },
+    )
+    
+    if err != nil {
+        fmt.Printf("❌ 视频生成失败: %v\n", err)
+    } else {
+        fmt.Println("✅ 视频生成成功！")
+    }
+}
+```
+
+</CodeGroup>
+
+## 支持的参数
+
+- **model**: 使用的模型名称 （jimeng-video-3.0-pro、 jimeng-video-3.0-720P、 jimeng-video-3.0-1080P）
+- **prompt**: 视频描述文本（必需，建议400字以内）
+- **req_key**: 用于指定具体的即梦模型版本（必选）
+  - jimeng-video-3.0-pro: `jimeng_ti2v_v30_pro`
+  - jimeng-video-3.0-720P:  `jimeng_t2v_v30 （文生图）`, `jimeng_i2v_first_v30（首帧）`, `jimeng_i2v_first_tail_v30（首尾帧）`, `jimeng_i2v_recamera_v30（运镜）`
+  - jimeng-video-3.0-1080P: `jimeng_t2v_v30_1080p（文生图）`, `jimeng_i2v_first_v30_1080（首帧）`, `jimeng_i2v_first_tail_v30_1080（首尾帧）`
+- **seed**: 随机种子，默认-1（随机），可指定固定值获得一致结果
+- **frames**: 生成的总帧数，可选值[121, 241]，默认121
+- **seconds**: 视频时长（秒），支持5秒或10秒，系统会自动转换为对应帧数（5秒=121帧，10秒=241帧）
+- **size**: 视频尺寸，格式为 `宽x高`（如 `1280x720`），系统会自动转换为对应的宽高比
+- **aspect_ratio**: 生成视频的长宽比，默认"16:9"，支持常见比例（即梦官方参数）
+- **image_urls**: 参考图片URL数组
+- **content**: 内容数组，支持文本和图片的组合输入（平台兼容格式）
+
+## 图生视频示例
+
+除了文本到视频生成，即梦也支持从图片生成视频。以下示例展示如何使用参考图片生成视频：
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.tokenops.ai/v1/videos \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "jimeng-video-3.0-pro",
+    "prompt": "根据图片内容生成一段动态视频，保持画面风格一致",
+    "req_key": "jimeng_ti2v_v30_pro",
+    "image_urls": ["https://example.com/reference_image.jpg"],
+    "seed": -1,
+    "frames": 241,
+    "aspect_ratio": "16:9"
+  }'
+```
+
+```python Python
+# 图生视频示例
+def create_image_to_video(prompt, image_url, **kwargs):
+    """
+    图片到视频生成
+    
+    Args:
+        prompt: 视频描述文本
+        image_url: 参考图片URL
+        **kwargs: 其他参数
+    
+    Returns:
+        任务创建响应
+    """
+    return create_jimeng_video(
+        prompt=prompt,
+        image_urls=[image_url],
+        **kwargs
+    )
+
+# 使用示例
+image_url = "https://example.com/beautiful_landscape.jpg"
+result = create_image_to_video(
+    prompt="根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果",
+    image_url=image_url,
+    req_key="jimeng_ti2v_v30_pro",
+    seed=12345,  # 固定种子获得一致结果
+    frames=241,  # 更长的视频
+    aspect_ratio="16:9"
+)
+
+if result:
+    print(f"图生视频任务已创建: {result['id']}")
+```
+
+```javascript JavaScript/Node.js
+// 图生视频示例
+async function createImageToVideo(prompt, imageUrl, options = {}) {
+    return await createJimengVideo(prompt, 'jimeng_ti2v_v30_pro', {
+        image_urls: [imageUrl],
+        ...options
+    });
+}
+
+// 使用示例
+const imageUrl = 'https://example.com/beautiful_landscape.jpg';
+const result = await createImageToVideo(
+    '根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果',
+    imageUrl,
+    {
+        req_key: 'jimeng_ti2v_v30_pro',
+        seed: 12345,
+        frames: 241,
+        aspect_ratio: '16:9'
+    }
+);
+
+if (result) {
+    console.log(`图生视频任务已创建: ${result.id}`);
+}
+```
+
+```go Go
+// 图生视频示例
+func createImageToVideo(prompt, imageUrl string, options JimengVideoRequest) (*JimengVideoResponse, error) {
+    options.ImageUrls = []string{imageUrl}
+    return createJimengVideo(prompt, options)
+}
+
+// 使用示例
+func main() {
+    imageUrl := "https://example.com/beautiful_landscape.jpg"
+    result, err := createImageToVideo(
+        "根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果",
+        imageUrl,
+        JimengVideoRequest{
+            ReqKey:      "jimeng_ti2v_v30_pro",
+            Seed:        12345,
+            Frames:      241,
+            AspectRatio: "16:9",
+        },
+    )
+    
+    if err != nil {
+        fmt.Printf("图生视频任务创建失败: %v\n", err)
+        return
+    }
+    
+    fmt.Printf("图生视频任务已创建: %s\n", result.ID)
+}
+```
+
+</CodeGroup>
+
+### 图生视频示例场景
+
+```text
+风景图片 + "微风轻抚树叶，云朵缓缓移动，阳光变化"
+人物图片 + "人物眨眼微笑，头发轻微摆动"
+建筑图片 + "灯光闪烁，窗户透出温暖光芒"
+动物图片 + "小动物轻微摆动，眼睛转动"
+```
+
+## 任务状态说明
+
+- **in_queue**: 任务已提交，正在排队等待处理
+- **processing**: 任务正在处理中
+- **completed**: 任务已完成，可以下载视频
+- **failed**: 任务失败
+
+---
+
+# 即梦 OmniHuman 数字人
+
+即梦 OmniHuman 是一个数字人视频生成服务，支持通过人像图片和音频生成数字人说话视频。完整的数字人视频生成流程分为三个步骤：
+
+1. **主体检测**（可选）- 检测图片中的主体，返回 mask 图 URL 列表
+2. **主体识别**（可选）- 识别图片中是否包含人/类人/拟人主体
+3. **视频生成** - 提交数字人视频生成任务
+
+<Note>
+**说明**：
+- 主体检测和主体识别是可选步骤，用于预检查图片是否适合生成数字人视频
+- 如果图片中有多个人物，可以通过主体检测获取 mask URL，在视频生成时指定说话的主体
+- 视频生成任务复用即梦视频生成接口，任务状态查询和视频下载与普通视频生成相同
+</Note>
+
+## 步骤1：主体检测（可选）
+
+主体检测是一个**同步接口**，用于检测图片中的主体并返回对应的 mask 图 URL 列表。最多支持检测 5 个主体。
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.tokenops.ai/v1/omnihuman/subject/detection \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "req_key": "jimeng_realman_avatar_object_detection",
+    "image_url": "https://example.com/portrait.jpg"
+  }'
+```
+
+```python Python
+import requests
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def detect_subject(image_url, req_key="jimeng_realman_avatar_object_detection"):
+    """
+    主体检测 - 检测图片中的主体，返回 mask 图 URL 列表
+
+    Args:
+        image_url: 人像图片 URL
+        req_key: 服务标识
+
+    Returns:
+        检测结果，包含 status 和 mask_urls
+    """
+    url = f"{BASE_URL}/omnihuman/subject/detection"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "req_key": req_key,
+        "image_url": image_url
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 200:
+            result = response.json()
+            print(f"主体检测完成")
+            print(f"是否包含主体: {'是' if result.get('status') == 1 else '否'}")
+            print(f"检测到的 mask 数量: {len(result.get('mask_urls', []))}")
+            return result
+        else:
+            print(f"检测失败: {response.status_code} - {response.text}")
+            return None
+
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 示例：检测主体
+result = detect_subject("https://example.com/portrait.jpg")
+if result and result.get('mask_urls'):
+    print(f"Mask URLs: {result['mask_urls']}")
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function detectSubject(imageUrl, reqKey = 'jimeng_realman_avatar_object_detection') {
+    const url = `${BASE_URL}/omnihuman/subject/detection`;
+
+    try {
+        const response = await axios.post(url, {
+            req_key: reqKey,
+            image_url: imageUrl
+        }, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('主体检测完成');
+        console.log(`是否包含主体: ${response.data.status === 1 ? '是' : '否'}`);
+        console.log(`检测到的 mask 数量: ${(response.data.mask_urls || []).length}`);
+
+        return response.data;
+    } catch (error) {
+        console.error('检测失败:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：检测主体
+const result = await detectSubject('https://example.com/portrait.jpg');
+if (result && result.mask_urls) {
+    console.log('Mask URLs:', result.mask_urls);
+}
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+const (
+    APIKey  = "<API-KEY>"
+    BaseURL = "https://api.tokenops.ai/v1"
+)
+
+type SubjectDetectionRequest struct {
+    ReqKey   string `json:"req_key"`
+    ImageURL string `json:"image_url"`
+}
+
+type SubjectDetectionResponse struct {
+    Status    int      `json:"status"`
+    MaskURLs  []string `json:"mask_urls,omitempty"`
+    RequestID string   `json:"request_id,omitempty"`
+}
+
+func detectSubject(imageURL string, reqKey string) (*SubjectDetectionResponse, error) {
+    if reqKey == "" {
+        reqKey = "jimeng_realman_avatar_object_detection"
+    }
+    url := fmt.Sprintf("%s/omnihuman/subject/detection", BaseURL)
+
+    reqBody := SubjectDetectionRequest{
+        ReqKey:   reqKey,
+        ImageURL: imageURL,
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("JSON序列化失败: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("创建请求失败: %v", err)
+    }
+
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+
+    responseBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("读取响应失败: %v", err)
+    }
+
+    if resp.StatusCode != 200 {
+        return nil, fmt.Errorf("API错误: %d - %s", resp.StatusCode, string(responseBody))
+    }
+
+    var result SubjectDetectionResponse
+    if err := json.Unmarshal(responseBody, &result); err != nil {
+        return nil, fmt.Errorf("解析响应失败: %v", err)
+    }
+
+    fmt.Println("主体检测完成")
+    if result.Status == 1 {
+        fmt.Println("是否包含主体: 是")
+    } else {
+        fmt.Println("是否包含主体: 否")
+    }
+    fmt.Printf("检测到的 mask 数量: %d\n", len(result.MaskURLs))
+
+    return &result, nil
+}
+
+// 示例：检测主体
+func main() {
+    result, err := detectSubject("https://example.com/portrait.jpg", "")
+    if err != nil {
+        fmt.Printf("检测失败: %v\n", err)
+        return
+    }
+
+    if len(result.MaskURLs) > 0 {
+        fmt.Printf("Mask URLs: %v\n", result.MaskURLs)
+    }
+}
+```
+
+</CodeGroup>
+
+### 主体检测响应示例
+
+```json
+{
+  "status": 1,
+  "mask_urls": [
+    "https://example.com/mask1.png",
+    "https://example.com/mask2.png"
+  ],
+  "request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+### 主体检测参数说明
+
+**请求参数：**
+
+| 参数 | 类型 | 必选 | 说明 |
+|------|------|------|------|
+| **req_key** | String | 是 | 服务标识，如 `jimeng_realman_avatar_object_detection` |
+| **image_url** | String | 是 | 人像图片 URL 链接 |
+
+**响应参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| **status** | Integer | 是否包含主体：0-不包含主体，1-包含主体 |
+| **mask_urls** | Array | 主体对应的 mask 图 URL 列表（按 mask 面积从大到小排序，URL 有效期 1 小时） |
+| **request_id** | String | 请求 ID |
+
+## 步骤2：主体识别（可选）
+
+主体识别是一个**异步接口**，用于识别图片中是否包含人、类人、拟人等主体。
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.tokenops.ai/v1/omnihuman/subject/recognition \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "req_key": "jimeng_realman_avatar_picture_create_role_omni_v15",
+    "image_url": "https://example.com/portrait.jpg"
+  }'
+```
+
+```python Python
+import requests
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def recognize_subject(image_url, req_key="jimeng_realman_avatar_picture_create_role_omni_v15"):
+    """
+    主体识别 - 识别图片中是否包含人/类人/拟人主体
+
+    Args:
+        image_url: 人像图片 URL
+        req_key: 服务标识
+
+    Returns:
+        识别结果，包含 status
+    """
+    url = f"{BASE_URL}/omnihuman/subject/recognition"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "req_key": req_key,
+        "image_url": image_url
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 200:
+            result = response.json()
+            print(f"主体识别完成")
+            print(f"识别结果: {'包含人/类人/拟人主体' if result.get('status') == 1 else '不包含人/类人/拟人主体'}")
+            return result
+        else:
+            print(f"识别失败: {response.status_code} - {response.text}")
+            return None
+
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 示例：识别主体
+result = recognize_subject("https://example.com/portrait.jpg")
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function recognizeSubject(imageUrl, reqKey = 'jimeng_realman_avatar_picture_create_role_omni_v15') {
+    const url = `${BASE_URL}/omnihuman/subject/recognition`;
+
+    try {
+        const response = await axios.post(url, {
+            req_key: reqKey,
+            image_url: imageUrl
+        }, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('主体识别完成');
+        console.log(`识别结果: ${response.data.status === 1 ? '包含人/类人/拟人主体' : '不包含人/类人/拟人主体'}`);
+
+        return response.data;
+    } catch (error) {
+        console.error('识别失败:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：识别主体
+const result = await recognizeSubject('https://example.com/portrait.jpg');
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+type SubjectRecognitionRequest struct {
+    ReqKey   string `json:"req_key"`
+    ImageURL string `json:"image_url"`
+}
+
+type SubjectRecognitionResponse struct {
+    TaskID    string `json:"task_id,omitempty"`
+    Status    int    `json:"status"`
+    RequestID string `json:"request_id,omitempty"`
+}
+
+func recognizeSubject(imageURL string, reqKey string) (*SubjectRecognitionResponse, error) {
+    if reqKey == "" {
+        reqKey = "jimeng_realman_avatar_picture_create_role_omni_v15"
+    }
+    url := fmt.Sprintf("%s/omnihuman/subject/recognition", BaseURL)
+
+    reqBody := SubjectRecognitionRequest{
+        ReqKey:   reqKey,
+        ImageURL: imageURL,
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("JSON序列化失败: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("创建请求失败: %v", err)
+    }
+
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+
+    responseBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("读取响应失败: %v", err)
+    }
+
+    if resp.StatusCode != 200 {
+        return nil, fmt.Errorf("API错误: %d - %s", resp.StatusCode, string(responseBody))
+    }
+
+    var result SubjectRecognitionResponse
+    if err := json.Unmarshal(responseBody, &result); err != nil {
+        return nil, fmt.Errorf("解析响应失败: %v", err)
+    }
+
+    fmt.Println("主体识别完成")
+    if result.Status == 1 {
+        fmt.Println("识别结果: 包含人/类人/拟人主体")
+    } else {
+        fmt.Println("识别结果: 不包含人/类人/拟人主体")
+    }
+
+    return &result, nil
+}
+
+// 示例：识别主体
+func main() {
+    result, err := recognizeSubject("https://example.com/portrait.jpg", "")
+    if err != nil {
+        fmt.Printf("识别失败: %v\n", err)
+        return
+    }
+    fmt.Printf("识别结果: %+v\n", result)
+}
+```
+
+</CodeGroup>
+
+### 主体识别响应示例
+
+```json
+{
+  "task_id": "xxxxxxxx",
+  "status": 1,
+  "request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+### 主体识别参数说明
+
+**请求参数：**
+
+| 参数 | 类型 | 必选 | 说明 |
+|------|------|------|------|
+| **req_key** | String | 是 | 服务标识，如 `jimeng_realman_avatar_picture_create_role_omni_v15` |
+| **image_url** | String | 是 | 人像图片 URL 链接 |
+
+**响应参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| **task_id** | String | 任务 ID |
+| **status** | Integer | 识别结果：0-不包含人/类人/拟人主体，1-包含人/类人/拟人主体 |
+| **request_id** | String | 请求 ID |
+
+## 步骤3：数字人视频生成
+
+数字人视频生成复用即梦视频生成接口（`/v1/videos`），通过 `generation_type` 参数设置为 `"omni_human"` 来触发数字人视频生成。
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://api.tokenops.ai/v1/videos \
+  --header 'Authorization: Bearer <API-KEY>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "jimeng_realman_avatar_picture_omni_v15",
+    "prompt": "自然说话，面带微笑",
+    "generation_type": "omni_human",
+    "output_resolution": 1080,
+    "content": [
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://example.com/portrait.jpg"
+        }
+      },
+      {
+        "type": "audio_url",
+        "audio_url": {
+          "url": "https://example.com/speech.mp3"
+        }
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+import time
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def create_omnihuman_video(image_url, audio_url, prompt="", model="jimeng_realman_avatar_picture_omni_v15", **kwargs):
+    """
+    创建 OmniHuman 数字人视频生成任务
+
+    Args:
+        image_url: 人像图片 URL
+        audio_url: 音频 URL（时长必须小于60秒）
+        prompt: 提示词（可选，建议长度≤300字符）
+        model: 数字人模型名称
+        **kwargs: 其他可选参数（mask_urls, output_resolution, pe_fast_mode, seed）
+
+    Returns:
+        任务创建响应
+    """
+    url = f"{BASE_URL}/videos"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # 构建请求数据
+    data = {
+        "model": model,
+        "prompt": prompt,
+        "generation_type": "omni_human",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_url
+                }
+            },
+            {
+                "type": "audio_url",
+                "audio_url": {
+                    "url": audio_url
+                }
+            }
+        ]
+    }
+
+    # 添加可选参数
+    if "mask_urls" in kwargs:
+        data["mask_urls"] = kwargs["mask_urls"]
+    if "output_resolution" in kwargs:
+        data["output_resolution"] = kwargs["output_resolution"]
+    if "pe_fast_mode" in kwargs:
+        data["pe_fast_mode"] = kwargs["pe_fast_mode"]
+    if "seed" in kwargs:
+        data["seed"] = kwargs["seed"]
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+
+        if response.status_code == 200:
+            result = response.json()
+            print(f"OmniHuman 视频生成任务已创建")
+            print(f"任务ID: {result.get('id')}")
+            print(f"状态: {result.get('status')}")
+            return result
+        else:
+            print(f"错误: {response.status_code} - {response.text}")
+            return None
+
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 示例：创建数字人视频生成任务
+result = create_omnihuman_video(
+    image_url="https://example.com/portrait.jpg",
+    audio_url="https://example.com/speech.mp3",
+    prompt="自然说话，面带微笑",
+    output_resolution=1080,  # 输出分辨率：720 或 1080
+    pe_fast_mode=False       # 是否启用快速模式
+)
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function createOmniHumanVideo(imageUrl, audioUrl, prompt = '', model = 'jimeng_realman_avatar_picture_omni_v15', options = {}) {
+    const url = `${BASE_URL}/videos`;
+
+    const data = {
+        model: model,
+        prompt: prompt,
+        generation_type: 'omni_human',
+        content: [
+            {
+                type: 'image_url',
+                image_url: {
+                    url: imageUrl
+                }
+            },
+            {
+                type: 'audio_url',
+                audio_url: {
+                    url: audioUrl
+                }
+            }
+        ],
+        ...options
+    };
+
+    try {
+        const response = await axios.post(url, data, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('OmniHuman 视频生成任务已创建');
+        console.log(`任务ID: ${response.data.id}`);
+        console.log(`状态: ${response.data.status}`);
+
+        return response.data;
+    } catch (error) {
+        console.error('任务创建失败:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：创建数字人视频生成任务
+const result = await createOmniHumanVideo(
+    'https://example.com/portrait.jpg',
+    'https://example.com/speech.mp3',
+    '自然说话，面带微笑',
+    'jimeng_realman_avatar_picture_omni_v15',
+    {
+        output_resolution: 1080,
+        pe_fast_mode: false
+    }
+);
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+type OmniHumanVideoRequest struct {
+    Model            string         `json:"model"`
+    Prompt           string         `json:"prompt,omitempty"`
+    GenerationType   string         `json:"generation_type"`
+    Content          []InputContent `json:"content"`
+    MaskURLs         []string       `json:"mask_urls,omitempty"`
+    OutputResolution int            `json:"output_resolution,omitempty"`
+    PeFastMode       *bool          `json:"pe_fast_mode,omitempty"`
+    Seed             int            `json:"seed,omitempty"`
+}
+
+type InputContent struct {
+    Type     string    `json:"type"`
+    ImageURL *MediaURL `json:"image_url,omitempty"`
+    AudioURL *MediaURL `json:"audio_url,omitempty"`
+}
+
+type MediaURL struct {
+    URL string `json:"url"`
+}
+
+type VideoResponse struct {
+    ID        string `json:"id"`
+    Object    string `json:"object"`
+    CreatedAt int64  `json:"created_at"`
+    Status    string `json:"status"`
+}
+
+func createOmniHumanVideo(imageURL, audioURL, prompt, model string, outputResolution int, peFastMode bool) (*VideoResponse, error) {
+    url := fmt.Sprintf("%s/videos", BaseURL)
+
+    reqBody := OmniHumanVideoRequest{
+        Model:            model,
+        Prompt:           prompt,
+        GenerationType:   "omni_human",
+        OutputResolution: outputResolution,
+        PeFastMode:       &peFastMode,
+        Content: []InputContent{
+            {
+                Type:     "image_url",
+                ImageURL: &MediaURL{URL: imageURL},
+            },
+            {
+                Type:     "audio_url",
+                AudioURL: &MediaURL{URL: audioURL},
+            },
+        },
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("JSON序列化失败: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("创建请求失败: %v", err)
+    }
+
+    req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", APIKey))
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("请求失败: %v", err)
+    }
+    defer resp.Body.Close()
+
+    responseBody, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, fmt.Errorf("读取响应失败: %v", err)
+    }
+
+    if resp.StatusCode != 200 {
+        return nil, fmt.Errorf("API错误: %d - %s", resp.StatusCode, string(responseBody))
+    }
+
+    var result VideoResponse
+    if err := json.Unmarshal(responseBody, &result); err != nil {
+        return nil, fmt.Errorf("解析响应失败: %v", err)
+    }
+
+    fmt.Println("OmniHuman 视频生成任务已创建")
+    fmt.Printf("任务ID: %s\n", result.ID)
+    fmt.Printf("状态: %s\n", result.Status)
+
+    return &result, nil
+}
+
+// 示例：创建数字人视频生成任务
+func main() {
+    result, err := createOmniHumanVideo(
+        "https://example.com/portrait.jpg",
+        "https://example.com/speech.mp3",
+        "自然说话，面带微笑",
+        "jimeng_realman_avatar_picture_omni_v15",
+        1080,
+        false,
+    )
+    if err != nil {
+        fmt.Printf("任务创建失败: %v\n", err)
+        return
+    }
+    fmt.Printf("任务创建成功: %+v\n", result)
+}
+```
+
+</CodeGroup>
+
+### 数字人视频生成响应示例
+
+```json
+{
+  "id": "10762451179911711518",
+  "object": "video",
+  "created_at": 1762776961,
+  "status": "in_queue"
+}
+```
+
+### 数字人视频生成参数说明
+
+| 参数 | 类型 | 必选 | 说明 |
+|------|------|------|------|
+| **model** | String | 是 | 数字人模型名称，如 `jimeng_realman_avatar_picture_omni_v15` |
+| **generation_type** | String | 是 | 生成类型，数字人场景必须设置为 `"omni_human"` |
+| **content** | Array | 是 | 内容数组，必须包含 `image_url` 和 `audio_url` |
+| **prompt** | String | 否 | 提示词，建议长度 ≤ 300 字符 |
+| **mask_urls** | Array | 否 | mask 图 URL 列表，用于指定说话的主体（当图片中有多个人物时使用） |
+| **output_resolution** | Integer | 否 | 输出视频分辨率：720 或 1080，默认 1080 |
+| **pe_fast_mode** | Boolean | 否 | 是否启用快速模式，默认 false |
+| **seed** | Integer | 否 | 随机种子，默认 -1（随机） |
+
+<Note>
+**关于 mask 图传递方式**：
+除了使用 `mask_urls` 参数，也可以在 `content` 数组中添加带有 `role: "mask_image"` 的图片元素来传递 mask 图：
+```json
+{
+  "type": "image_url",
+  "role": "mask_image",
+  "image_url": {
+    "url": "https://example.com/mask.png"
+  }
+}
+```
+</Note>
+
+### Content 数组说明
+
+`content` 数组必须包含以下两种类型的元素：
+
+**图片元素（必选）：**
+```json
+{
+  "type": "image_url",
+  "image_url": {
+    "url": "https://example.com/portrait.jpg"
+  }
+}
+```
+
+**音频元素（必选）：**
+```json
+{
+  "type": "audio_url",
+  "audio_url": {
+    "url": "https://example.com/speech.mp3"
+  }
+}
+```
+
+<Warning>
+**注意事项**：
+- 音频时长必须小于 60 秒
+- 图片建议使用清晰的人像正面照
+- 如果图片中有多个人物，建议先调用主体检测接口获取 mask URL，然后在 `mask_urls` 参数中指定说话的主体
+</Warning>
+
+## 查询任务状态和下载视频
+
+数字人视频生成任务创建后，可以使用与普通视频生成相同的接口来查询任务状态和下载视频：
+
+- **查询状态**：`GET /v1/videos/{video_id}`
+- **下载视频**：`GET /v1/videos/{video_id}/content`
+
+详细用法请参考上方 [步骤2：查询任务状态](#步骤2查询任务状态) 和 [步骤3：下载生成的视频](#步骤3下载生成的视频) 部分。
+
+## 完整流程示例
+
+以下是一个完整的数字人视频生成流程示例，包括主体检测、视频生成、状态轮询和下载：
+
+<CodeGroup>
+
+```python Python
+import requests
+import time
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def complete_omnihuman_video_generation(image_url, audio_url, prompt=""):
+    """
+    完整的 OmniHuman 数字人视频生成流程
+    """
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    # 步骤1: 主体检测（可选，用于获取 mask）
+    print("步骤1: 主体检测...")
+    detect_resp = requests.post(
+        f"{BASE_URL}/omnihuman/subject/detection",
+        headers=headers,
+        json={"image_url": image_url}
+    )
+
+    mask_urls = []
+    if detect_resp.status_code == 200:
+        detect_result = detect_resp.json()
+        print(f"主体检测完成: status={detect_result.get('status')}")
+        mask_urls = detect_result.get('mask_urls', [])
+        if mask_urls:
+            print(f"检测到 {len(mask_urls)} 个主体")
+
+    # 步骤2: 创建视频生成任务
+    print("\n步骤2: 创建视频生成任务...")
+    video_data = {
+        "model": "jimeng_realman_avatar_picture_omni_v15",
+        "prompt": prompt,
+        "generation_type": "omni_human",
+        "output_resolution": 1080,
+        "content": [
+            {"type": "image_url", "image_url": {"url": image_url}},
+            {"type": "audio_url", "audio_url": {"url": audio_url}}
+        ]
+    }
+
+    # 如果有多个主体，使用第一个 mask
+    if len(mask_urls) > 1:
+        video_data["mask_urls"] = [mask_urls[0]]
+        print(f"使用 mask: {mask_urls[0]}")
+
+    create_resp = requests.post(
+        f"{BASE_URL}/videos",
+        headers=headers,
+        json=video_data
+    )
+
+    if create_resp.status_code != 200:
+        print(f"创建任务失败: {create_resp.text}")
+        return False
+
+    video_id = create_resp.json().get('id')
+    print(f"任务ID: {video_id}")
+
+    # 步骤3: 轮询任务状态
+    print("\n步骤3: 等待任务完成...")
+    max_wait_time = 600  # 10分钟
+    start_time = time.time()
+
+    while time.time() - start_time < max_wait_time:
+        status_resp = requests.get(
+            f"{BASE_URL}/videos/{video_id}",
+            headers={"Authorization": f"Bearer {API_KEY}"}
+        )
+
+        if status_resp.status_code == 200:
+            status_result = status_resp.json()
+            status = status_result.get('status')
+            print(f"当前状态: {status}")
+
+            if status == 'completed':
+                print("视频生成完成！")
+                break
+            elif status == 'failed':
+                print(f"视频生成失败: {status_result.get('error')}")
+                return False
+
+        time.sleep(15)
+    else:
+        print("等待超时")
+        return False
+
+    # 步骤4: 下载视频
+    print("\n步骤4: 下载视频...")
+    download_resp = requests.get(
+        f"{BASE_URL}/videos/{video_id}/content",
+        headers={"Authorization": f"Bearer {API_KEY}"}
+    )
+
+    if download_resp.status_code == 200:
+        output_path = f"omnihuman_video_{video_id}.mp4"
+        with open(output_path, "wb") as f:
+            f.write(download_resp.content)
+        print(f"视频已保存: {output_path}")
+        return True
+    else:
+        print(f"下载失败: {download_resp.status_code}")
+        return False
+
+# 使用示例
+if __name__ == "__main__":
+    success = complete_omnihuman_video_generation(
+        image_url="https://example.com/portrait.jpg",
+        audio_url="https://example.com/speech.mp3",
+        prompt="自然说话，面带微笑"
+    )
+
+    if success:
+        print("\n✅ 数字人视频生成成功！")
+    else:
+        print("\n❌ 数字人视频生成失败！")
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+const fs = require('fs');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function completeOmniHumanVideoGeneration(imageUrl, audioUrl, prompt = '') {
+    const headers = {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json'
+    };
+
+    try {
+        // 步骤1: 主体检测（可选）
+        console.log('步骤1: 主体检测...');
+        let maskUrls = [];
+        try {
+            const detectResp = await axios.post(
+                `${BASE_URL}/omnihuman/subject/detection`,
+                { image_url: imageUrl },
+                { headers }
+            );
+            console.log(`主体检测完成: status=${detectResp.data.status}`);
+            maskUrls = detectResp.data.mask_urls || [];
+            if (maskUrls.length > 0) {
+                console.log(`检测到 ${maskUrls.length} 个主体`);
+            }
+        } catch (e) {
+            console.log('主体检测跳过');
+        }
+
+        // 步骤2: 创建视频生成任务
+        console.log('\n步骤2: 创建视频生成任务...');
+        const videoData = {
+            model: 'jimeng_realman_avatar_picture_omni_v15',
+            prompt: prompt,
+            content: [
+                { type: 'image_url', image_url: { url: imageUrl } },
+                { type: 'audio_url', audio_url: { url: audioUrl } }
+            ],
+            output_resolution: 1080
+        };
+
+        if (maskUrls.length > 1) {
+            videoData.mask_urls = [maskUrls[0]];
+            console.log(`使用 mask: ${maskUrls[0]}`);
+        }
+
+        const createResp = await axios.post(
+            `${BASE_URL}/videos`,
+            videoData,
+            { headers }
+        );
+
+        const videoId = createResp.data.id;
+        console.log(`任务ID: ${videoId}`);
+
+        // 步骤3: 轮询任务状态
+        console.log('\n步骤3: 等待任务完成...');
+        const maxWaitTime = 10 * 60 * 1000; // 10分钟
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitTime) {
+            const statusResp = await axios.get(
+                `${BASE_URL}/videos/${videoId}`,
+                { headers: { 'Authorization': `Bearer ${API_KEY}` } }
+            );
+
+            const status = statusResp.data.status;
+            console.log(`当前状态: ${status}`);
+
+            if (status === 'completed') {
+                console.log('视频生成完成！');
+                break;
+            } else if (status === 'failed') {
+                console.log(`视频生成失败: ${statusResp.data.error}`);
+                return false;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 15000));
+        }
+
+        // 步骤4: 下载视频
+        console.log('\n步骤4: 下载视频...');
+        const downloadResp = await axios.get(
+            `${BASE_URL}/videos/${videoId}/content`,
+            {
+                headers: { 'Authorization': `Bearer ${API_KEY}` },
+                responseType: 'stream'
+            }
+        );
+
+        const outputPath = `omnihuman_video_${videoId}.mp4`;
+        const writer = fs.createWriteStream(outputPath);
+        downloadResp.data.pipe(writer);
+
+        return new Promise((resolve, reject) => {
+            writer.on('finish', () => {
+                console.log(`视频已保存: ${outputPath}`);
+                resolve(true);
+            });
+            writer.on('error', reject);
+        });
+
+    } catch (error) {
+        console.error('执行失败:', error.response?.data || error.message);
+        return false;
+    }
+}
+
+// 使用示例
+(async () => {
+    const success = await completeOmniHumanVideoGeneration(
+        'https://example.com/portrait.jpg',
+        'https://example.com/speech.mp3',
+        '自然说话，面带微笑'
+    );
+
+    if (success) {
+        console.log('\n✅ 数字人视频生成成功！');
+    } else {
+        console.log('\n❌ 数字人视频生成失败！');
+    }
+})();
+```
+
+</CodeGroup>
+
+## 平台兼容视频接口
+
+除了使用传统的 `prompt` + `image_urls` 格式，我们的平台还支持使用 JSON 格式的 `content` 字段来传递 prompt 和参考图片，这种方式更加灵活，适合程序化调用。
+
+### Content 字段结构
+
+`content` 是一个数组，每个元素包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| **type** | String | 内容类型：`text`（文本）、`image_url`（图片URL）、`image_base64`（Base64图片） |
+| **text** | String | 文本内容（当 type=text 时） |
+| **image_url** | Object | 图片信息（当 type=image_url 或 image_base64 时），包含 `url` 字段 |
+
+### 纯文本生成视频
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tokenops.ai/v1/videos" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "jimeng-video-3.0-pro",
+    "size": "1280x720",
+    "seconds": "5",
+    "req_key": "jimeng_ti2v_v30_pro",
+    "content": [
+      {
+        "type": "text",
+        "text": "千军万马奔腾在草原上，阳光明媚，高清画质"
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+import json
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def generate_video_with_content(content, model="jimeng-video-3.0-pro", size="1280x720", seconds="5", req_key="jimeng_ti2v_v30_pro"):
+    """
+    使用 content 字段生成视频
+    """
+    url = f"{BASE_URL}/videos"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": model,
+        "size": size,
+        "seconds": seconds,
+        "req_key": req_key,
+        "content": content
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        print(f"视频生成任务已启动")
+        print(f"任务ID: {result.get('id', 'N/A')}")
+        print(f"状态: {result.get('status', 'N/A')}")
+        return result
+    else:
+        print(f"错误: {response.status_code} - {response.text}")
+        return None
+
+# 示例：纯文本生成
+content = [
+    {
+        "type": "text",
+        "text": "千军万马奔腾在草原上，阳光明媚，高清画质"
+    }
+]
+result = generate_video_with_content(content)
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function generateVideoWithContent(content, options = {}) {
+    const url = `${BASE_URL}/videos`;
+
+    const data = {
+        model: options.model || 'jimeng-video-3.0-pro',
+        size: options.size || '1280x720',
+        seconds: options.seconds || '5',
+        req_key: options.req_key || 'jimeng_ti2v_v30_pro',
+        content: content
+    };
+
+    try {
+        const response = await axios.post(url, data, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('视频生成任务已启动');
+        console.log(`任务ID: ${response.data.id || 'N/A'}`);
+        console.log(`状态: ${response.data.status || 'N/A'}`);
+
+        return response.data;
+    } catch (error) {
+        console.error('错误:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例：纯文本生成
+const content = [
+    {
+        type: 'text',
+        text: '千军万马奔腾在草原上，阳光明媚，高清画质'
+    }
+];
+generateVideoWithContent(content);
+```
+
+</CodeGroup>
+
+### 使用图片 URL 作为参考帧
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tokenops.ai/v1/videos" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "jimeng-video-3.0-pro",
+    "size": "1280x720",
+    "seconds": "5",
+    "req_key": "jimeng_ti2v_v30_pro",
+    "content": [
+      {
+        "type": "text",
+        "text": "根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果"
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "https://example.com/landscape.jpg"
+        }
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def generate_video_with_image_url(prompt, image_url, model="jimeng-video-3.0-pro", size="1280x720", seconds="5", req_key="jimeng_ti2v_v30_pro"):
+    """
+    使用图片 URL 作为参考帧生成视频
+    """
+    url = f"{BASE_URL}/videos"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": model,
+        "size": size,
+        "seconds": seconds,
+        "req_key": req_key,
+        "content": [
+            {
+                "type": "text",
+                "text": prompt
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_url
+                }
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        print(f"视频生成任务已启动")
+        print(f"任务ID: {result.get('id', 'N/A')}")
+        return result
+    else:
+        print(f"错误: {response.status_code} - {response.text}")
+        return None
+
+# 示例
+result = generate_video_with_image_url(
+    prompt="根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果",
+    image_url="https://example.com/landscape.jpg"
+)
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function generateVideoWithImageUrl(prompt, imageUrl, options = {}) {
+    const url = `${BASE_URL}/videos`;
+
+    const data = {
+        model: options.model || 'jimeng-video-3.0-pro',
+        size: options.size || '1280x720',
+        seconds: options.seconds || '5',
+        req_key: options.req_key || 'jimeng_ti2v_v30_pro',
+        content: [
+            {
+                type: 'text',
+                text: prompt
+            },
+            {
+                type: 'image_url',
+                image_url: {
+                    url: imageUrl
+                }
+            }
+        ]
+    };
+
+    try {
+        const response = await axios.post(url, data, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('视频生成任务已启动');
+        console.log(`任务ID: ${response.data.id || 'N/A'}`);
+        return response.data;
+    } catch (error) {
+        console.error('错误:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例
+generateVideoWithImageUrl(
+    '根据这张风景图生成一段视频，展现微风轻抚、云朵缓缓移动的动态效果',
+    'https://example.com/landscape.jpg'
+);
+```
+
+</CodeGroup>
+
+### 使用 Base64 编码的图片
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tokenops.ai/v1/videos" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "jimeng-video-3.0-pro",
+    "size": "1280x720",
+    "seconds": "5",
+    "req_key": "jimeng_ti2v_v30_pro",
+    "content": [
+      {
+        "type": "text",
+        "text": "让画面中的小猫跳跃玩耍"
+      },
+      {
+        "type": "image_base64",
+        "image_url": {
+          "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+        }
+      }
+    ]
+  }'
+```
+
+```python Python
+import requests
+import base64
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1"
+
+def generate_video_with_base64_image(prompt, image_path, model="jimeng-video-3.0-pro", size="1280x720", seconds="5", req_key="jimeng_ti2v_v30_pro"):
+    """
+    使用 Base64 编码的图片作为参考帧生成视频
+    """
+    # 读取图片并转为 Base64
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+
+    # 根据文件扩展名确定 MIME 类型
+    ext = image_path.lower().split(".")[-1]
+    mime_type = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp"
+    }.get(ext, "image/jpeg")
+
+    url = f"{BASE_URL}/videos"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    data = {
+        "model": model,
+        "size": size,
+        "seconds": seconds,
+        "req_key": req_key,
+        "content": [
+            {
+                "type": "text",
+                "text": prompt
+            },
+            {
+                "type": "image_base64",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{image_data}"
+                }
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        print(f"视频生成任务已启动")
+        print(f"任务ID: {result.get('id', 'N/A')}")
+        return result
+    else:
+        print(f"错误: {response.status_code} - {response.text}")
+        return None
+
+# 示例
+result = generate_video_with_base64_image(
+    prompt="让画面中的小猫跳跃玩耍",
+    image_path="cat.jpg"
+)
+```
+
+```javascript JavaScript/Node.js
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+
+const API_KEY = '<API-KEY>';
+const BASE_URL = 'https://api.tokenops.ai/v1';
+
+async function generateVideoWithBase64Image(prompt, imagePath, options = {}) {
+    // 读取图片并转为 Base64
+    const imageData = fs.readFileSync(imagePath);
+    const base64Data = imageData.toString('base64');
+
+    // 根据文件扩展名确定 MIME 类型
+    const ext = path.extname(imagePath).toLowerCase().slice(1);
+    const mimeTypes = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp'
+    };
+    const mimeType = mimeTypes[ext] || 'image/jpeg';
+
+    const url = `${BASE_URL}/videos`;
+
+    try {
+        const response = await axios.post(url, {
+            model: options.model || 'jimeng-video-3.0-pro',
+            size: options.size || '1280x720',
+            seconds: options.seconds || '5',
+            req_key: options.req_key || 'jimeng_ti2v_v30_pro',
+            content: [
+                {
+                    type: 'text',
+                    text: prompt
+                },
+                {
+                    type: 'image_base64',
+                    image_url: {
+                        url: `data:${mimeType};base64,${base64Data}`
+                    }
+                }
+            ]
+        }, {
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('视频生成任务已启动');
+        console.log(`任务ID: ${response.data.id || 'N/A'}`);
+        return response.data;
+    } catch (error) {
+        console.error('错误:', error.response?.data || error.message);
+        return null;
+    }
+}
+
+// 示例
+generateVideoWithBase64Image('让画面中的小猫跳跃玩耍', 'cat.jpg');
+```
+
+</CodeGroup>
+
+### Content 字段请求示例
+
+```json
+{
+  "model": "jimeng-video-3.0-pro",
+  "size": "1280x720",
+  "seconds": "5",
+  "req_key": "jimeng_ti2v_v30_pro",
+  "content": [
+    {
+      "type": "text",
+      "text": "根据图片生成一段动态视频"
+    },
+    {
+      "type": "image_url",
+      "image_url": {
+        "url": "https://example.com/image.jpg"
+      }
+    }
+  ]
+}
+```
+
+<Note>
+**提示**：
+- 使用 `content` 字段时，系统会自动从中提取文本作为 prompt，提取图片作为参考帧
+- `seconds` 参数支持 "5" 或 "10"，系统会自动转换为对应的帧数（5秒=121帧，10秒=241帧）
+- `size` 参数会自动转换为对应的宽高比，例如 "1280x720" 会转换为 "16:9"
+- 如果同时提供了 `prompt` 字段和 `content` 中的文本，`content` 中的文本会优先使用
+</Note>
+

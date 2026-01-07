@@ -1,0 +1,445 @@
+---
+title: 'Veo-3 视频生成示例'
+description: '使用 Veo-3 API 进行视频生成的完整示例代码'
+---
+
+# Veo-3 视频生成示例
+
+以下示例展示如何使用 Veo-3模型生成高质量的视频内容。Veo-3是Google最新的视频生成模型，支持高分辨率、长时长的视频生成。
+
+## 快速开始
+
+<CodeGroup>
+
+```bash cURL
+# 1. 提交视频生成任务
+curl -X POST "https://api.tokenops.ai/v1beta/models/veo-3.0-generate-001:predictLongRunning" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -d '{
+    "instances": [
+      {
+        "prompt": "一个年轻的渔夫在海边举着一条大鱼，阳光明媚，背景是蔚蓝的大海和晴朗的天空"
+      }
+    ],
+    "parameters": {
+      "aspectRatio": "16:9",
+      "durationSeconds": 4,
+      "enhancePrompt": true,
+      "resolution": "1080p",
+      "sampleCount": 1,
+      "seed": 12345,
+      "compressionQuality": "OPTIMIZED"
+    }
+  }'
+
+# 2. 查询任务状态（使用返回的 name 字段作为 OPERATION_NAME）
+curl -X GET "https://api.tokenops.ai/v1beta/{OPERATION_NAME}" \
+  -H "Authorization: Bearer <API-KEY>"
+```
+
+```python Python
+import requests
+import json
+import time
+import base64
+from pathlib import Path
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1beta"
+
+def generate_veo3_video(prompt, parameters=None):
+    """
+    使用Veo-3生成视频
+    
+    Args:
+        prompt: 视频描述文本
+        parameters: 视频生成参数
+    
+    Returns:
+        任务操作信息
+    """
+    url = f"{BASE_URL}/models/veo-3.0-generate-001:predictLongRunning"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    
+    # 默认参数
+    default_parameters = {
+        "aspectRatio": "16:9",
+        "durationSeconds": 4,
+        "enhancePrompt": True,
+        "resolution": "1080p",
+        "sampleCount": 1,
+        "compressionQuality": "OPTIMIZED"
+    }
+    
+    if parameters:
+        default_parameters.update(parameters)
+    
+    data = {
+        "instances": [
+            {
+                "prompt": prompt
+            }
+        ],
+        "parameters": default_parameters
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"Veo-3视频生成任务已启动")
+            print(f"操作名称: {result.get('name', 'N/A')}")
+            return result
+        else:
+            print(f"错误: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+def check_veo3_operation_status(operation_name):
+    """
+    检查Veo-3操作状态
+
+    Args:
+        operation_name: 操作名称（完整路径）
+
+    Returns:
+        操作状态信息
+    """
+    url = f"{BASE_URL}/{operation_name}"
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"查询失败: {response.status_code} - {response.text}")
+            return None
+
+    except Exception as e:
+        print(f"查询请求失败: {e}")
+        return None
+
+def download_veo3_video(video_uri, output_path="veo3_generated_video.mp4"):
+    """
+    下载Veo-3生成的视频
+    
+    Args:
+        video_uri: 视频URI（通常是base64编码的数据）
+        output_path: 输出文件路径
+        
+    Returns:
+        是否下载成功
+    """
+    try:
+        if video_uri.startswith('data:'):
+            # 处理base64编码的视频数据
+            header, encoded = video_uri.split(',', 1)
+            video_data = base64.b64decode(encoded)
+            
+            with open(output_path, "wb") as f:
+                f.write(video_data)
+            
+            print(f"视频已保存: {output_path}")
+            return True
+        else:
+            # 处理HTTP URL
+            response = requests.get(video_uri)
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                print(f"视频已保存: {output_path}")
+                return True
+            else:
+                print(f"下载失败: {response.status_code}")
+                return False
+                
+    except Exception as e:
+        print(f"下载失败: {e}")
+        return False
+
+def generate_veo3_video_complete(prompt, parameters=None, max_wait_time=600):
+    """
+    完整的Veo-3视频生成流程：生成 -> 等待 -> 下载
+    
+    Args:
+        prompt: 视频描述文本
+        parameters: 视频生成参数
+        max_wait_time: 最大等待时间（秒）
+        
+    Returns:
+        生成的视频文件路径
+    """
+    print("开始使用Veo-3生成视频...")
+    
+    # 1. 启动视频生成
+    result = generate_veo3_video(prompt, parameters)
+    if not result:
+        return None
+    
+    operation_name = result.get('name')
+    if not operation_name:
+        print("未获取到操作名称")
+        return None
+    
+    # 2. 等待视频生成完成
+    print("正在生成视频，请耐心等待...")
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait_time:
+        status_info = check_veo3_operation_status(operation_name)
+        if not status_info:
+            break
+        
+        done = status_info.get('done', False)
+        print(f"任务状态: {'完成' if done else '进行中'}")
+        
+        if done:
+            # 检查是否有错误
+            if 'error' in status_info:
+                error_info = status_info['error']
+                print(f"视频生成失败: {error_info.get('message', '未知错误')}")
+                return None
+            
+            # 检查响应结果
+            response = status_info.get('response', {})
+            generated_videos = response.get('generatedVideos', [])
+            
+            if generated_videos and len(generated_videos) > 0:
+                generated_video = generated_videos[0]
+                video_data = generated_video.get('video', {})
+                
+                # 查找视频数据
+                video_uri = None
+                if 'videoBytes' in video_data and video_data['videoBytes'] != '<base64>':
+                    video_uri = f"data:video/mp4;base64,{video_data['videoBytes']}"
+                elif 'uri' in video_data:
+                    video_uri = video_data['uri']
+                
+                if video_uri:
+                    print("视频生成完成！")
+                    break
+                else:
+                    print("未找到视频数据")
+                    return None
+            else:
+                print("响应中未找到生成的视频")
+                return None
+        
+        time.sleep(15)  # 等待15秒后再次检查
+    else:
+        print("视频生成超时")
+        return None
+    
+    # 3. 下载视频
+    operation_id = operation_name.split('/')[-1]
+    output_path = f"veo3_video_{operation_id}.mp4"
+    
+    if download_veo3_video(video_uri, output_path):
+        return output_path
+    
+    return None
+
+def generate_with_reference_image(prompt, image_path, parameters=None):
+    """
+    使用参考图片生成视频
+    
+    Args:
+        prompt: 视频描述文本
+        image_path: 参考图片路径
+        parameters: 视频生成参数
+        
+    Returns:
+        任务操作信息
+    """
+    if not Path(image_path).exists():
+        print(f"参考图片不存在: {image_path}")
+        return None
+    
+    # 读取并编码图片
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode('utf-8')
+    
+    # 获取图片MIME类型
+    mime_type = "image/jpeg"
+    if image_path.lower().endswith('.png'):
+        mime_type = "image/png"
+    elif image_path.lower().endswith('.webp'):
+        mime_type = "image/webp"
+    
+    url = f"{BASE_URL}/models/veo-3.0-generate-001:predictLongRunning"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    
+    # 默认参数
+    default_parameters = {
+        "aspectRatio": "16:9",
+        "durationSeconds": 4,
+        "enhancePrompt": True,
+        "resolution": "1080p",
+        "sampleCount": 1,
+        "compressionQuality": "OPTIMIZED"
+    }
+    
+    if parameters:
+        default_parameters.update(parameters)
+    
+    data = {
+        "instances": [
+            {
+                "prompt": prompt,
+                "image": {
+                    "bytesBase64Encoded": image_data,
+                    "mimeType": mime_type
+                }
+            }
+        ],
+        "parameters": default_parameters
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        
+        if response.status_code == 200:
+            result = response.json()
+            print(f"带参考图片的Veo-3视频生成任务已启动")
+            print(f"操作名称: {result.get('name', 'N/A')}")
+            return result
+        else:
+            print(f"错误: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+# 使用示例
+if __name__ == "__main__":
+    print("=== Veo-3 视频生成示例 ===\n")
+    
+    # 示例1: 基础文本到视频生成
+    prompt1 = "一个年轻的渔夫在海边举着一条大鱼，阳光明媚，背景是蔚蓝的大海和晴朗的天空"
+    parameters1 = {
+        "aspectRatio": "16:9",
+        "durationSeconds": 4,
+        "enhancePrompt": True,
+        "resolution": "1080p",
+        "seed": 12345
+    }
+    
+    print("示例1: 基础文本到视频生成")
+    video_path1 = generate_veo3_video_complete(prompt1, parameters1)
+    
+    if video_path1:
+        print(f"视频生成成功: {video_path1}")
+    else:
+        print("视频生成失败")
+    
+    print("\n" + "="*50 + "\n")
+    
+    # 示例2: 高分辨率长视频生成
+    prompt2 = "一只可爱的小猫在花园里慢慢走动，阳光透过树叶洒下斑驳的光影，电影级别的画质"
+    parameters2 = {
+        "aspectRatio": "16:9",
+        "durationSeconds": 8,  # 8秒视频
+        "enhancePrompt": True,
+        "resolution": "1080p",
+        "compressionQuality": "HIGH_QUALITY"
+    }
+    
+    print("示例2: 高分辨率长视频生成")
+    video_path2 = generate_veo3_video_complete(prompt2, parameters2)
+    
+    if video_path2:
+        print(f"高质量视频生成成功: {video_path2}")
+    else:
+        print("高质量视频生成失败")
+    
+    print("\n" + "="*50 + "\n")
+    
+    # 示例3: 带参考图片的视频生成
+    print("示例3: 带参考图片的视频生成")
+    reference_image = "reference_image.jpg"  # 请确保文件存在
+    
+    if Path(reference_image).exists():
+        prompt3 = "根据参考图片生成一段动态视频，保持图片中的主要元素和构图"
+        result3 = generate_with_reference_image(prompt3, reference_image)
+        
+        if result3:
+            operation_name = result3.get('name')
+            print(f"带参考图片的任务已启动: {operation_name}")
+            # 可以继续使用 generate_veo3_video_complete 的等待和下载逻辑
+        else:
+            print("带参考图片的视频生成启动失败")
+    else:
+        print(f"参考图片不存在: {reference_image}")
+```
+
+</CodeGroup>
+
+## 支持的参数
+
+- **aspectRatio**: 视频宽高比（"16:9" 默认、"9:16"）
+- **durationSeconds**: 生成的视频的时长（"4"、"6"、"8"）。使用扩展或插值时必须为"8"（同时支持16:9和9:16），使用referenceImages时必须为"8"（仅支持16:9）
+- **enhancePrompt**: 是否增强提示词（建议设为true）
+- **resolution**: 视频分辨率（"720p" 默认、"1080p" 仅支持8秒时长）
+- **seed**: 随机种子（用于可重复生成）
+- **generateAudio**: 是否生成音频（true/false）
+- **negativePrompt**: 负向提示词，描述不希望在视频中出现的内容
+- **personGeneration**: 控制人物的生成。文生视频和扩展功能仅限"allow_all"，图生视频、插帧和参考图片仅限"allow_adult"
+
+## 视频生成流程
+
+1. **提交任务**: 发送predictLongRunning请求，获得操作名称
+2. **等待处理**: 轮询操作状态直到完成
+3. **下载视频**: 从响应中提取视频数据并保存
+
+## 响应示例
+
+### 任务提交响应
+```json
+{
+  "name": "projects/gcp-quwan-gemini/locations/us-central1/publishers/google/models/veo-3.0-generate-001/operations/2cd6428a-24c4-4a35-be15-65b62861c2ba"
+}
+```
+
+### 状态查询响应（进行中）
+```json
+{
+  "name": "projects/gcp-quwan-gemini/locations/us-central1/publishers/google/models/veo-3.0-generate-001/operations/2cd6428a-24c4-4a35-be15-65b62861c2ba",
+  "done": false
+}
+```
+
+### 状态查询响应（完成）
+```json
+{
+  "done": true,
+  "name": "projects/gcp-quwan-gemini/locations/us-central1/publishers/google/models/veo-3.0-generate-001/operations/2cd6428a-24c4-4a35-be15-65b62861c2ba",
+  "response": {
+    "generatedVideos": [
+      {
+        "video": {
+          "mimeType": "video/mp4",
+          "uri": "xxxxxx",
+          "videoBytes": "<base64>"
+        }
+      }
+    ]
+  }
+}
+```

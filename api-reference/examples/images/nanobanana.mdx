@@ -1,0 +1,455 @@
+---
+title: 'Nano Banana (Gemini) 图片生成'
+description: '使用 Gemini 原生图像生成功能，通过对话方式创建和编辑图像'
+---
+
+# Gemini 图片生成
+
+Gemini API 提供强大的原生图像生成能力，采用对话式方法。您可以使用文本提示、图像或两者结合来生成、修改和迭代视觉内容，实现前所未有的控制。
+
+## 核心功能
+
+- **文本生成图像**: 从文本描述生成高质量图像
+- **图像+文本编辑**: 使用文本提示修改现有图像
+- **多图合成**: 组合多个图像的元素或转换风格
+- **迭代优化**: 通过对话式交互逐步改进图像
+- **高保真文本渲染**: 在图像中生成清晰可读的文本
+
+> **提示**: nano-banana-pro 的参数基本与 nano-banana 一致，可以参考本文档的使用方法和示例。
+
+## nano-banana-pro 特性
+
+nano-banana-pro 是一款先进的图片生成和编辑模型，针对专业资源制作进行了优化：
+
+- **高分辨率输出**：内置 1K、2K 和 4K 视觉效果生成功能
+- **高级文字渲染**：能够为信息图表、菜单、图表和营销素材资源生成清晰易读的风格化文字
+- **使用 Google 搜索进行接地**：模型可以使用 Google 搜索作为工具来验证事实，并根据实时数据（例如当前天气地图、股票图表、近期活动）生成图像
+- **思考模式**：模型会利用"思考"过程来推理复杂的提示，生成临时"思维图像"以在生成最终的高质量输出之前优化构图
+- **最多 14 张参考图片**：您现在最多可以混合使用 14 张参考图片来生成最终图片
+
+## 基础用法
+
+### 文本生成图像
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tokenops.ai/v1beta/models/nano-banana-pro:generateContent" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <API-KEY>" \
+  -d '{
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "在高档餐厅中展示一道纳米香蕉菜肴，带有 TokenOPS 主题"
+          }
+        ]
+      }
+    ]
+  }' \
+  | jq . \
+  | grep -o '"data": "[^"]*"' \
+  | cut -d'"' -f4 \
+  | base64 --decode > gemini-native-image.png
+```
+
+```python Python
+import requests
+import base64
+from PIL import Image
+from io import BytesIO
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1beta"
+
+def generate_image(prompt):
+    """使用 Gemini 从文本生成图像"""
+    url = f"{BASE_URL}/models/nano-banana-pro:generateContent"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+
+        # 提取并保存图像
+        for candidate in result.get('candidates', []):
+            for part in candidate.get('content', {}).get('parts', []):
+                if 'inlineData' in part:
+                    # 解码 base64 图像数据
+                    image_data = base64.b64decode(part['inlineData']['data'])
+                    image = Image.open(BytesIO(image_data))
+                    image.save("generated_image.png")
+                    print("图像已保存为 generated_image.png")
+                    return image
+    else:
+        print(f"错误: {response.status_code} - {response.text}")
+        return None
+
+# 使用示例
+prompt = "在高档餐厅中展示一道纳米香蕉菜肴，带有 Gemini 主题"
+generate_image(prompt)
+```
+
+</CodeGroup>
+
+![gemini-native-image](/images/examples/gemini-native-image.png)
+
+### 图像编辑（图像+文本）
+
+您也可以提供现有图像和文本提示来编辑图像：
+
+<CodeGroup>
+
+```bash cURL
+IMG_PATH=/path/to/cat_image.jpeg
+
+if [[ "$(base64 --version 2>&1)" = *"FreeBSD"* ]]; then
+  B64FLAGS="--input"
+else
+  B64FLAGS="-w0"
+fi
+
+IMG_BASE64=$(base64 "$B64FLAGS" "$IMG_PATH" 2>&1)
+
+curl -X POST \
+  "https://generativelanguage.googleapis.com/v1beta/models/nano-banana-pro:generateContent" \
+    -H "x-goog-api-key: <API-KEY> \
+    -H 'Content-Type: application/json' \
+    -d "{
+      \"contents\": [{
+        \"parts\":[
+            {\"text\": \"'Create a picture of my cat eating a nano-banana in a fancy restaurant under the Gemini constellation\"},
+            {
+              \"inlineData\": {
+                \"mimeType\":\"image/jpeg\",
+                \"data\": \"$IMG_BASE64\"
+              }
+            }
+        ]
+      }]
+    }"  \
+  | jq . \
+  | grep -o '"data": "[^"]*"' \
+  | cut -d'"' -f4 \
+  | base64 --decode > gemini-edited-image.png
+```
+
+```python Python
+import requests
+import base64
+from PIL import Image
+from io import BytesIO
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1beta"
+
+def edit_image(image_path, prompt):
+    """使用 Gemini 编辑图像"""
+    url = f"{BASE_URL}/models/nano-banana-pro:generateContent"
+
+    # 读取并编码图像
+    with open(image_path, 'rb') as f:
+        image_data = base64.b64encode(f.read()).decode('utf-8')
+
+    # 确定 MIME 类型
+    mime_type = "image/png"
+    if image_path.lower().endswith(('.jpg', '.jpeg')):
+        mime_type = "image/jpeg"
+    elif image_path.lower().endswith('.webp'):
+        mime_type = "image/webp"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    data = {
+        "contents": [
+            {
+                "parts": [
+                    {
+                        "text": prompt
+                    },
+                    {
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": image_data
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+
+        # 提取并保存编辑后的图像
+        for candidate in result.get('candidates', []):
+            for part in candidate.get('content', {}).get('parts', []):
+                if 'inlineData' in part:
+                    image_data = base64.b64decode(part['inlineData']['data'])
+                    image = Image.open(BytesIO(image_data))
+                    image.save("edited_image.png")
+                    print("编辑后的图像已保存为 edited_image.png")
+                    return image
+    else:
+        print(f"错误: {response.status_code} - {response.text}")
+        return None
+
+# 使用示例
+edit_image("cat.jpg", "给这只猫加一顶小巫师帽")
+```
+
+</CodeGroup>
+
+## 配置选项
+
+### 仅返回图像
+
+默认情况下，Gemini 会返回图像和文本响应。要仅获取图像：
+
+```python Python
+data = {
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "在高档餐厅中展示一道纳米香蕉菜肴"
+                }
+            ]
+        }
+    ],
+    "generationConfig": {
+        "responseModalities": ["Image"]  # 仅返回图像
+    }
+}
+```
+
+### 控制宽高比
+
+指定输出图像的宽高比：
+
+```python Python
+data = {
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "在高档餐厅中展示一道纳米香蕉菜肴"
+                }
+            ]
+        }
+    ],
+    "generationConfig": {
+        "imageConfig": {
+            "aspectRatio": "16:9"
+        }
+    }
+}
+```
+
+### 可用的宽高比
+
+`1:1`、`16:9`、`9:16`、`3:2`、`2:3`、`4:3`、`3:4`、`5:4`、`4:5`、`21:9`
+
+### 分辨率对照表
+
+#### nano-banana
+
+| 宽高比 | 分辨率 | 令牌 |
+|--------|--------|------|
+| 1:1 | 1024x1024 | 1290 |
+| 2:3 | 832x1248 | 1290 |
+| 3:2 | 1248x832 | 1290 |
+| 3:4 | 864x1184 | 1290 |
+| 4:3 | 1184x864 | 1290 |
+| 4:5 | 896x1152 | 1290 |
+| 5:4 | 1152x896 | 1290 |
+| 9:16 | 768x1344 | 1290 |
+| 16:9 | 1344x768 | 1290 |
+| 21:9 | 1536x672 | 1290 |
+
+#### nano-banana-pro
+
+| 宽高比 | 1K 分辨率 | 1K 令牌 | 2K 分辨率 | 2K 令牌 | 4K 分辨率 | 4K 令牌 |
+|--------|-----------|---------|-----------|---------|-----------|---------|
+| 1:1 | 1024x1024 | 1120 | 2048x2048 | 1120 | 4096x4096 | 2000 |
+| 2:3 | 848x1264 | 1120 | 1696x2528 | 1120 | 3392x5056 | 2000 |
+| 3:2 | 1264x848 | 1120 | 2528x1696 | 1120 | 5056x3392 | 2000 |
+| 3:4 | 896x1200 | 1120 | 1792x2400 | 1120 | 3584x4800 | 2000 |
+| 4:3 | 1200x896 | 1120 | 2400x1792 | 1120 | 4800x3584 | 2000 |
+| 4:5 | 928x1152 | 1120 | 1856x2304 | 1120 | 3712x4608 | 2000 |
+| 5:4 | 1152x928 | 1120 | 2304x1856 | 1120 | 4608x3712 | 2000 |
+| 9:16 | 768x1376 | 1120 | 1536x2752 | 1120 | 3072x5504 | 2000 |
+| 16:9 | 1376x768 | 1120 | 2752x1536 | 1120 | 5504x3072 | 2000 |
+| 21:9 | 1584x672 | 1120 | 3168x1344 | 1120 | 6336x2688 | 2000 |
+
+### 分辨率控制
+
+指定输出图像的分辨率，可选值：`1K`、`2K`、`4K`
+
+```python Python
+data = {
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "一只可爱的小猫在花园里玩耍，阳光明媚，油画风格"
+                }
+            ]
+        }
+    ],
+    "generationConfig": {
+        "imageConfig": {
+            "aspectRatio": "1:1",
+            "imageSize": "4K"
+        }
+    }
+}
+```
+
+## 多轮图片修改
+
+Gemini 的对话式特性允许您通过多轮交互逐步完善图像。以下示例展示了一个完整的多轮对话流程：先生成初始图像，然后基于该图像进行修改。
+
+```python Python
+import requests
+import base64
+from PIL import Image
+from io import BytesIO
+
+API_KEY = "<API-KEY>"
+BASE_URL = "https://api.tokenops.ai/v1beta"
+
+def generate_content(prompt, inline_data=None):
+    """生成内容，支持纯文本或图像+文本输入
+
+    Args:
+        prompt: 文本提示
+        inline_data: 上一轮返回的 inlineData 对象（包含 mimeType 和 data）
+    """
+    url = f"{BASE_URL}/models/nano-banana-pro:generateContent"
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    # 构建请求内容
+    parts = [{"text": prompt}]
+
+    # 如果提供了图像数据，添加到请求中
+    if inline_data:
+        parts.append({"inlineData": inline_data})
+
+    data = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": parts
+            }
+        ],
+        "generationConfig": {
+            "responseModalities": ["TEXT", "IMAGE"]
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+
+    if response.status_code == 200:
+        result = response.json()
+        text_response = None
+        image = None
+        output_inline_data = None
+
+        for candidate in result.get('candidates', []):
+            for part in candidate.get('content', {}).get('parts', []):
+                if 'text' in part:
+                    text_response = part['text']
+                    print(f"文本响应: {text_response}")
+                if 'inlineData' in part:
+                    output_inline_data = part['inlineData']
+                    img_data = base64.b64decode(output_inline_data['data'])
+                    image = Image.open(BytesIO(img_data))
+
+        return text_response, image, output_inline_data
+    return None, None, None
+
+# ===== 第一轮：生成初始图像 =====
+prompt_turn1 = """创建一个生动的信息图，将光合作用解释为植物最喜欢的食物配方。
+展示"原料"（阳光、水、二氧化碳）和"成品"（糖/能量）。
+风格应该像一本色彩丰富的儿童烹饪书的一页，适合四年级学生阅读。
+图片中的文字使用英文。"""
+
+text1, image1, inline_data1 = generate_content(prompt_turn1)
+if image1:
+    image1.save("turn1_image.png")
+    print("第一轮图像已保存为 turn1_image.png")
+
+# ===== 第二轮：基于第一轮图像进行迭代编辑 =====
+prompt_turn2 = "生成一张新图片，将图片中的所有英文文字翻译成中文"
+
+text2, image2, inline_data2 = generate_content(prompt_turn2, inline_data1)
+if image2:
+    image2.save("turn2_image.png")
+    print("第二轮图像已保存为 turn2_image.png")
+```
+
+## 多图合成
+
+您可以提供多个图像作为输入（建议最多 3 张）：
+
+```python Python
+# 读取多张图片
+with open('image1.jpg', 'rb') as f1:
+    img1_data = base64.b64encode(f1.read()).decode('utf-8')
+
+with open('image2.jpg', 'rb') as f2:
+    img2_data = base64.b64encode(f2.read()).decode('utf-8')
+
+data = {
+    "contents": [
+        {
+            "parts": [
+                {
+                    "text": "将这些图像组合成一个拼贴画，创意布局"
+                },
+                {
+                    "inlineData": {
+                        "mimeType": "image/jpeg",
+                        "data": img1_data
+                    }
+                },
+                {
+                    "inlineData": {
+                        "mimeType": "image/jpeg",
+                        "data": img2_data
+                    }
+                }
+            ]
+        }
+    ]
+}
+```
+
